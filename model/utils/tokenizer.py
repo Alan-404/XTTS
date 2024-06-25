@@ -15,9 +15,6 @@ from spacy.lang.ja import Japanese
 from spacy.lang.zh import Chinese
 from tokenizers import Tokenizer
 
-
-
-
 def get_spacy_lang(lang):
     if lang == "zh":
         return Chinese()
