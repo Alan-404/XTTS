@@ -120,7 +120,7 @@ class XTTSProcessor:
     
     def clean_text(self, sentence: str) -> str:
         sentence = str(sentence)
-        sentence = re.sub(self.puncs, "", sentence)
+        # sentence = re.sub(self.puncs, "", sentence)
         sentence = re.sub(r"\s\s+", " ", sentence)
         sentence = sentence.strip()
         return sentence
