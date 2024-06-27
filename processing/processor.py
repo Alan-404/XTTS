@@ -68,6 +68,8 @@ class XTTSProcessor:
             norm="slaney"
         ).to(device)
 
+        self.device = device
+
     def create_vocab_dictionary(self, vocab: List[str], pad_token: str, delim_token: str, unk_token: str):
         dictionary = []
         dictionary.append(pad_token)
@@ -193,14 +195,21 @@ class XTTSProcessor:
         signal = signal / MAX_AUDIO_VALUE
         if target_sr is not None and target_sr != sr:
             signal = librosa.resample(signal, orig_sr=sr, target_sr=target_sr)
-        signal = torch.tensor(signal)
+        signal = torch.tensor(signal, dtype=torch.float32).to(self.device)
         return signal
     
     def log_mel(self, x: torch.Tensor, C: int = 1, clip_val: float = 1e-5):
         return torch.log(torch.clamp(x, min=clip_val) * C)
     
-    def speaker_mel_spectrogram(self, x: torch.Tensor):
+    def speaker_mel_spectrogram(self, x: torch.Tensor) -> torch.Tensor:
         x = self.speaker_spectrogram(x)
+        x = self.log_mel(x)
+        return x
+    
+    def gt_mel_spectrogram(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.gt_spectrogram(x)
+        x = self.log_mel(x)
+        return x
     
     def __call__(self, texts: List[str], signals: List[torch.Tensor]) -> torch.Any:
         pass

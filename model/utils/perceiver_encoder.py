@@ -185,19 +185,16 @@ class RMSNorm(nn.Module):
         return out * gamma + beta
 
 
-class CausalConv1d(nn.Conv1d):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        (kernel_size,) = self.kernel_size
-        (dilation,) = self.dilation
-        (stride,) = self.stride
-
-        assert stride == 1
+class CausalConv1d(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int, dilation: int = 1) -> None:
+        super().__init__()
         self.causal_padding = dilation * (kernel_size - 1)
+        self.conv = nn.Conv1d(in_channels, out_channels, kernel_size=kernel_size, dilation=dilation)
 
-    def forward(self, x):
-        causal_padded_x = F.pad(x, (self.causal_padding, 0), value=0.0)
-        return super().forward(causal_padded_x)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = F.pad(x, (self.causal_padding, 0), value=0.)
+        x = self.conv(x)
+        return x
 
 
 class GEGLU(nn.Module):

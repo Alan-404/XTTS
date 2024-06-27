@@ -4,7 +4,6 @@ import torchaudio
 from model.modules.gpt import GPT
 from model.modules.decoder import HifiDecoder
 import librosa
-import os
 import torch.nn.functional as F
 
 from model.utils.tokenizer import split_sentence
