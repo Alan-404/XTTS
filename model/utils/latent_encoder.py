@@ -4,6 +4,8 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+from typing import Optional
+
 
 class GroupNorm32(nn.GroupNorm):
     def forward(self, x):
@@ -64,7 +66,6 @@ class QKVAttention(nn.Module):
         a = torch.einsum("bts,bcs->bct", weight, v)
 
         return a.reshape(bs, -1, length)
-
 
 class AttentionBlock(nn.Module):
     """An attention block that allows spatial positions to attend to each other."""
