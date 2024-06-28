@@ -78,5 +78,16 @@ class AttentionBlock(nn.Module):
         out = (xp + h).reshape((batch_size, xp.size(1), *spatial))
         return out
 
-
+class ConditioningEncoder(nn.Module):
+    def __init__(self, spec_dim: int, embedding_dim: int, attn_blocks: int = 6, num_attn_heads: int = 4) -> None:
+        super().__init__()
+        self.init = nn.Conv1d(spec_dim, embedding_dim, kernel_size=1)
+        self.attn = nn.ModuleList()
+        for _ in range(attn_blocks):
+            self.attn.append(AttentionBlock(embedding_dim, num_attn_heads))
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.init(x)
+        for layer in self.attn:
+            x = layer(x)
+        return x
         
