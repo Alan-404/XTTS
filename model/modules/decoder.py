@@ -415,7 +415,6 @@ class PreEmphasis(nn.Module):
         x = torch.nn.functional.pad(x.unsqueeze(1), (1, 0), "reflect")
         return torch.nn.functional.conv1d(x, self.filter).squeeze(1)
 
-
 class ResNetSpeakerEncoder(nn.Module):
     # pylint: disable=W0102
     def __init__(

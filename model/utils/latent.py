@@ -19,63 +19,59 @@ class GroupNorm32(nn.Module):
         return self.layer(x.float()).type(x.dtype)
     
 class AttentionBlock(nn.Module):
-    def __init__(self, channels: int, num_heads: int = 1, num_head_channels: int = -1, out_channels: Optional[int] = None, do_activation: bool = False) -> None:
+    def __init__(self, embedding_dim: int, num_heads: int = 1) -> None:
         super().__init__()
-        self.channels = channels
-        if out_channels is None:
-            out_channels = channels
-
-        self.do_activation = do_activation
-        if num_head_channels == -1:
-            self.num_heads = num_heads
-        else:
-            self.num_heads = num_heads // num_head_channels
+        self.embedding_dim = embedding_dim
+        self.num_heads = num_heads
         
-        self.norm = GroupNorm32(channels=channels)
-        self.qkv = nn.Conv1d(channels, out_channels*3, kernel_size=1)
+        self.num_samples_per_head = embedding_dim // num_heads
+        self.scale = 1 / math.sqrt(self.num_samples_per_head)
+        
+        self.norm = GroupNorm32(embedding_dim)
 
-        self.x_proj = nn.Identity() if out_channels == channels else nn.Conv1d(channels, out_channels, kernel_size=1)
-        self.proj_out = nn.Conv1d(out_channels, out_channels, kernel_size=1)
+        self.qkv_proj = nn.Conv1d(embedding_dim, embedding_dim * 3, kernel_size=1)
+        self.out_proj = nn.Conv1d(embedding_dim, embedding_dim, kernel_size=1)
 
         # Init Weights
-        nn.init.zeros_(self.proj_out.weight)
-        nn.init.zeros_(self.proj_out.bias)
+        nn.init.zeros_(self.out_proj.weight)
+        nn.init.zeros_(self.out_proj.bias)
 
-    def scaled_dot_product_attention(self, qkv: torch.Tensor, mask: Optional[torch.Tensor], qk_bias: int = 0):
-        batch_size, width, length = qkv.size()
+    def scaled_dot_product_attention(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None, qk_bias: int = 0):
+        '''
+            x: [batch_size, 3 * embedding_dim, length]
+            - embedding_dim = n_samples_per_head * num_heads
+        '''
+        batch_size = x.size(0)
 
-        ch = width // (3 * self.num_heads)
-        q, k, v = qkv.reshape((batch_size * self.num_heads, ch * 3, length)).split(ch, dim=1)
-        scale = 1 / math.sqrt(math.sqrt(ch))
+        q, k, v = x.reshape((batch_size, self.num_heads, 3 * self.num_samples_per_head, -1)).split(self.num_samples_per_head, dim=2) # (batch_size, num_heads, n_samples_per_head, length)
+        q = q.transpose(-1, -2) # (batch_size, num_heads, length, n_samples_per_head)
+        v = v.transpose(-1, -2) # (batch_size, num_heads, length, n_samples_per_head)
 
-        q = q * scale
-        k = k * scale
+        q = q * self.scale
+        k = k * self.scale
 
-        score = torch.matmul(q, k.transpose(-1, -2))
+        score = torch.matmul(q, k) # [batch_size, num_heads, length, length]
         score = score + qk_bias
         if mask is not None:
             score.masked_fill_(mask, -torch.inf)
         
         weights = F.softmax(score.float(), dim=-1)
-        context = torch.matmul(weights, v)
-        context = context.reshape(batch_size, -1, length)
+        context = torch.matmul(weights, v) # (batch_size, n_heads, length, n_samples_per_head)
+        context = context.transpose(-1, -2).reshape((batch_size, self.embedding_dim, -1))
 
         return context
 
     def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None, qk_bias: int = 0):
-        batch_size, channels, *spatial = x.size()
+        batch_size = x.size(0)
 
-        x = x.reshape((batch_size, channels, -1))
+        x = x.reshape((batch_size, self.embedding_dim, -1))
         x = self.norm(x)
-        if self.do_activation:
-            x = F.silu(x, inplace=True)
-        qkv = self.qkv(x)
-        h = self.scaled_dot_product_attention(qkv, mask, qk_bias)
-        h = self.proj_out(h)
 
-        xp = self.x_proj(x)
+        qkv = self.qkv_proj(x) # (batch_size, 3 * embedding_dim, length)
+        h = self.scaled_dot_product_attention(qkv, mask, qk_bias)
+        h = self.out_proj(h)
         
-        out = (xp + h).reshape((batch_size, xp.size(1), *spatial))
+        out = x + h
         return out
 
 class ConditioningEncoder(nn.Module):
