@@ -103,6 +103,12 @@ class ResBlock(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.net(x) + x
         return x
+    
+class UpsampleConv(nn.Module):
+    def __init__(self, conv: nn.Module, stride: int) -> None:
+        super().__init__()
+        self.stride = stride
+        self.conv = conv()
             
 class VQVAE(nn.Module):
     def __init__(self, *args, **kwargs) -> None:
