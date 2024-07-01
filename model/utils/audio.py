@@ -84,6 +84,7 @@ class Spectrogram(nn.Module):
         self.onesided = onesided
         self.register_buffer("window", window_fn(self.win_length))
 
+        self.num_pad = int((self.n_fft - self.hop_length) / 2)
         self.frame_length_norm = False
         self.window_norm = False
 
@@ -108,6 +109,9 @@ class Spectrogram(nn.Module):
         if self.pad > 0:
             x = F.pad(x, (self.pad, self.pad), mode='constant')
         
+        if self.center == False:
+            x = F.pad(x, (self.num_pad, self.num_pad), mode='reflect')
+
         x = torch.stft(
             input=x,
             n_fft=self.n_fft,
@@ -139,7 +143,7 @@ class MelScale(nn.Module):
                  norm: Optional[str] = None,
                  mel_scale: str = "htk") -> None:
         super().__init__()
-        assert mel_scale in ['htk', 'slaney']
+        assert mel_scale in ['htk', 'slaney'], "Invalid Format of Scaling"
 
         self.sample_rate = sample_rate
         self.n_stft = n_stft

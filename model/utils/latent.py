@@ -86,4 +86,3 @@ class ConditioningEncoder(nn.Module):
         for layer in self.attn:
             x = layer(x)
         return x
-        

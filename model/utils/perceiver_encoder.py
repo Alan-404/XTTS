@@ -261,13 +261,10 @@ class PerceiverResampler(nn.Module):
         batch = x.shape[0]
 
         x = self.proj_context(x)
-
         latents = repeat(self.latents, "n d -> b n d", b=batch)
-
         for attn, ff in self.layers:
             latents = attn(latents, x, mask=mask) + latents
             latents = ff(latents) + latents
-
         return self.norm(latents)
 
 
