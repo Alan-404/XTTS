@@ -23,10 +23,12 @@ class MelSpectrogram(nn.Module):
                  pad_mode: str = 'reflect',
                  onesided: bool = True,
                  norm: Optional[str] = None,
-                 mel_scale: str = 'htk') -> None:
+                 mel_scale: str = 'htk',
+                 mel_norm: bool = False) -> None:
         super().__init__()
         self.win_length = win_length if win_length is not None else n_fft
         self.hop_length = hop_length if hop_length is not None else self.win_length // 2
+        self.mel_norm = mel_norm
 
         self.f_max = f_max if f_max is not None else float(sample_rate // 2)
 
@@ -53,9 +55,20 @@ class MelSpectrogram(nn.Module):
             mel_scale=mel_scale
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.mel_norm:
+            self.register_buffer("norm", torch.randn((n_mels)))
+
+    def log_mel(self, x: torch.Tensor) -> torch.Tensor:
+        x = torch.log(torch.clamp(x, min=1e-5))
+        return x
+
+    def forward(self, x: torch.Tensor, log_mel: bool = True) -> torch.Tensor:
         x = self.spectrogram(x)
         x = self.mel_scale(x)
+        if log_mel:
+            x = self.log_mel(x)
+        if self.mel_norm:
+            x = x / self.norm.unsqueeze(0).unsqueeze(-1)
         return x
 
 class Spectrogram(nn.Module):
